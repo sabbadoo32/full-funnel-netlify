@@ -46,6 +46,9 @@ async function connectToDatabase() {
 
 exports.handler = async (event, context) => {
   try {
+    // Important: Reuse the MongoDB connection
+    context.callbackWaitsForEmptyEventLoop = false;
+
     // Initialize OpenAI with environment variables
     if (!openai) {
       const apiKey = process.env.OPENAI_API_KEY;
@@ -60,16 +63,19 @@ exports.handler = async (event, context) => {
     }
 
     // Connect to MongoDB
-    const db = await connectToDatabase();
-    if (!db) {
+    let db;
+    try {
+      db = await connectToDatabase();
+      if (!db) {
+        throw new Error('Database connection returned null');
+      }
+    } catch (dbError) {
+      console.error('MongoDB connection error:', dbError);
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: 'Failed to connect to MongoDB' })
+        body: JSON.stringify({ error: 'Failed to connect to MongoDB', details: dbError.message })
       };
     }
-
-    // Important: Reuse the MongoDB connection
-    context.callbackWaitsForEmptyEventLoop = false;
 
     // Handle CORS preflight
     if (event.httpMethod === 'OPTIONS') {
