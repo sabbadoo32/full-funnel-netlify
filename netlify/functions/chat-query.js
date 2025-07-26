@@ -4,6 +4,7 @@ const OpenAI = require('openai');
 // Initialize OpenAI and MongoDB with environment variables
 let openai;
 let cachedConnection = null;
+let Event;
 
 // Define schema
 const eventSchema = new mongoose.Schema({
@@ -12,14 +13,11 @@ const eventSchema = new mongoose.Schema({
   timestamp: Date
 }, { collection: 'events' }); // Explicitly specify collection name
 
-// Create model only if it hasn't been created
-const Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
-
 // Reuse connection
 async function connectToDatabase() {
   if (cachedConnection && mongoose.connection.readyState === 1) {
     console.log('Using cached database connection');
-    return Event;
+    return;
   }
 
   try {
@@ -47,8 +45,10 @@ async function connectToDatabase() {
       cachedConnection = null;
     });
 
+    // Create model after successful connection
+    Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
+
     console.log('MongoDB connected successfully');
-    return Event;
   } catch (error) {
     console.error('MongoDB connection error:', error);
     throw error;
@@ -162,7 +162,7 @@ exports.handler = async (event, context) => {
       const analysis = JSON.parse(analysisCompletion.choices[0].message.content);
       
       // Execute query using Mongoose
-      const Event = await connectToDatabase();
+      await connectToDatabase();
       const data = await Event.find(analysis.query).lean();
 
       // Generate insights
