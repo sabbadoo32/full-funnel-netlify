@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const OpenAI = require('openai');
 
-// Initialize OpenAI and MongoDB with environment variables from context
+// Initialize OpenAI and MongoDB with environment variables
 let openai;
 let uri;
 
@@ -34,16 +34,23 @@ async function connectToDatabase() {
 }
 
 exports.handler = async (event, context) => {
-  // Initialize OpenAI and MongoDB with environment variables from context
+  // Initialize OpenAI and MongoDB with environment variables
   if (!openai) {
-    openai = new OpenAI({
-      apiKey: context.OPENAI_API_KEY
-    });
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      console.error('OPENAI_API_KEY not found in process.env:', process.env);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'OPENAI_API_KEY environment variable is not set' })
+      };
+    }
+    openai = new OpenAI({ apiKey });
   }
 
   if (!uri) {
-    uri = context.MONGODB_URI;
+    uri = process.env.MONGODB_URI;
     if (!uri) {
+      console.error('MONGODB_URI not found in process.env:', process.env);
       return {
         statusCode: 500,
         body: JSON.stringify({ error: 'MONGODB_URI environment variable is not set' })
