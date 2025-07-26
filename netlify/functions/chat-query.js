@@ -3,21 +3,23 @@ const OpenAI = require('openai');
 
 // Initialize OpenAI and MongoDB with environment variables
 let openai;
-let cachedConnection = null;
-let Event;
+let cachedDb = null;
 
 // Define schema
 const eventSchema = new mongoose.Schema({
   organization_name: String,
   event_type: String,
   timestamp: Date
-}, { collection: 'events' }); // Explicitly specify collection name
+}, { collection: 'events' });
+
+// Create model
+const Event = mongoose.model('Event', eventSchema);
 
 // Reuse connection
 async function connectToDatabase() {
-  if (cachedConnection && mongoose.connection.readyState === 1) {
+  if (cachedDb) {
     console.log('Using cached database connection');
-    return;
+    return cachedDb;
   }
 
   try {
@@ -27,28 +29,13 @@ async function connectToDatabase() {
     }
 
     console.log('Creating new MongoDB connection...');
-    cachedConnection = await mongoose.connect(mongoUrl, {
+    cachedDb = await mongoose.connect(mongoUrl, {
       useNewUrlParser: true,
-      useUnifiedTopology: true,
-      bufferCommands: false,
-      serverSelectionTimeoutMS: 5000
+      useUnifiedTopology: true
     });
-    
-    // Handle connection errors
-    mongoose.connection.on('error', (err) => {
-      console.error('MongoDB connection error:', err);
-      cachedConnection = null;
-    });
-
-    mongoose.connection.on('disconnected', () => {
-      console.log('MongoDB disconnected');
-      cachedConnection = null;
-    });
-
-    // Create model after successful connection
-    Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
 
     console.log('MongoDB connected successfully');
+    return cachedDb;
   } catch (error) {
     console.error('MongoDB connection error:', error);
     throw error;
@@ -162,7 +149,7 @@ exports.handler = async (event, context) => {
       const analysis = JSON.parse(analysisCompletion.choices[0].message.content);
       
       // Execute query using Mongoose
-      await connectToDatabase();
+      const db = await connectToDatabase();
       const data = await Event.find(analysis.query).lean();
 
       // Generate insights
