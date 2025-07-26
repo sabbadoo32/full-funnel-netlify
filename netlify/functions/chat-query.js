@@ -1,27 +1,16 @@
-const mongoose = require('mongoose');
+const { MongoClient } = require('mongodb');
 const OpenAI = require('openai');
 
 // Initialize OpenAI and MongoDB with environment variables
 let openai;
-let isConnected = false;
-
-// Set Mongoose options
-mongoose.set('strictQuery', true);
-
-// Define schema
-const eventSchema = new mongoose.Schema({
-  organization_name: String,
-  event_type: String,
-  timestamp: Date
-}, { strict: true });
-
-// Create model
-const Event = mongoose.model('Event', eventSchema);
+let cachedDb = null;
+let client = null;
 
 // Reuse connection
 async function connectToDatabase() {
-  if (isConnected) {
-    return;
+  if (cachedDb && client) {
+    console.log('Using cached database connection');
+    return cachedDb;
   }
 
   try {
@@ -30,19 +19,25 @@ async function connectToDatabase() {
       throw new Error('MONGODB_URI environment variable is not set');
     }
 
-    console.log('Connecting to MongoDB...');
-    await mongoose.connect(mongoUrl, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
+    console.log('Creating new MongoDB connection...');
+    client = new MongoClient(mongoUrl, {
+      serverSelectionTimeoutMS: 5000,
+      socketTimeoutMS: 30000,
       serverApi: {
         version: '1',
         strict: true,
         deprecationErrors: true
       }
     });
+
+    await client.connect();
     
-    isConnected = true;
+    // Get database name from connection string
+    const dbName = mongoUrl.split('/').pop().split('?')[0];
+    cachedDb = client.db(dbName);
+    
     console.log('MongoDB connected successfully');
+    return cachedDb;
   } catch (error) {
     console.error('MongoDB connection error:', error);
     throw error;
