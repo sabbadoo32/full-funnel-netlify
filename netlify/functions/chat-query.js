@@ -1,10 +1,22 @@
 const { MongoClient } = require('mongodb');
-const OpenAI = require('openai');
+const { OpenAI } = require('openai');
+const fs = require('fs');
+const path = require('path');
 
-// Initialize OpenAI with project key
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+// Initialize OpenAI
+if (!process.env.OPENAI_API_KEY) {
+  console.error('OPENAI_API_KEY is not set in environment variables');
+  process.exit(1);
+}
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+// Rate limiting setup
+let lastRequestTime = 0;
+const MIN_REQUEST_GAP = 1000; // Minimum 1 second between requests
+
+// Model configuration
+const MODEL = 'gpt-4';
 
 // Initialize MongoDB connection
 const mongoUri = process.env.MONGODB_URI;
@@ -12,7 +24,7 @@ if (!mongoUri) {
   throw new Error('MONGODB_URI environment variable is not set');
 }
 
-const mongoClient = new MongoClient(mongoUri, { serverApi: { version: '1' } });
+const mongoClient = new MongoClient(mongoUri);
 let cachedDb = null;
 
 async function connectToDatabase() {
