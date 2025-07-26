@@ -83,57 +83,6 @@ async function connectToDatabase() {
   }
 }
 
-exports.handler = async function(event, context) {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
-
-  try {
-    const { message } = JSON.parse(event.body);
-    
-    if (!message?.trim()) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({ error: 'Message is required' })
-      };
-    }
-
-    // Connect to MongoDB
-    const { db } = await connectToDatabase();
-    const collection = db.collection('full_funnel');
-
-    // Simple test query
-    const result = await collection.aggregate([
-      {
-        $group: {
-          _id: '$organization_name',
-          count: { $sum: 1 }
-        }
-      }
-    ]).toArray();
-
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        data: result,
-        message: 'Query executed successfully'
-      })
-    };
-
-  } catch (error) {
-    console.error('Error:', error);
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Internal Server Error', details: error.message })
-    };
-  }
-  
-  await mongoClient.connect();
-  const db = mongoClient.db('full_funnel');
-  cachedDb = db;
-  return db;
-}
-
 exports.handler = async (event, context) => {
   // Important: Reuse the MongoDB connection
   context.callbackWaitsForEmptyEventLoop = false;
