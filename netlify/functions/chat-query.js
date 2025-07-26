@@ -34,9 +34,9 @@ async function callOpenAI(messages) {
 }
 
 // Initialize MongoDB connection with validation
-const mongoUri = process.env.MONGODB_URI;
+const mongoUri = process.env.MONGO_URI;
 if (!mongoUri?.trim()) {
-  throw new Error('MONGODB_URI is not defined or empty');
+  throw new Error('MONGO_URI is not defined or empty');
 }
 
 // MongoDB client setup with serverless-friendly settings
