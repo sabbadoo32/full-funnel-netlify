@@ -1,9 +1,7 @@
-const mongoose = require('mongoose');
+const { MongoClient } = require('mongodb');
 const { OpenAI } = require('openai');
-const fs = require('fs');
-const path = require('path');
 
-// Initialize OpenAI
+// Initialize OpenAI with rate limiting
 if (!process.env.OPENAI_API_KEY) {
   console.error('OPENAI_API_KEY is not set in environment variables');
   process.exit(1);
@@ -15,8 +13,25 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 let lastRequestTime = 0;
 const MIN_REQUEST_GAP = 1000; // Minimum 1 second between requests
 
-// Model configuration
+// Model configuration - matching test script that worked 36 hours ago
 const MODEL = 'gpt-4';
+
+// Helper for rate-limited OpenAI calls
+async function callOpenAI(messages) {
+  // Rate limiting
+  const now = Date.now();
+  const timeSinceLastRequest = now - lastRequestTime;
+  if (timeSinceLastRequest < MIN_REQUEST_GAP) {
+    await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_GAP - timeSinceLastRequest));
+  }
+  
+  const completion = await openai.chat.completions.create({
+    model: MODEL,
+    messages: messages
+  });
+  lastRequestTime = Date.now();
+  return completion;
+}
 
 // Initialize MongoDB connection
 const mongoUri = process.env.MONGODB_URI;
@@ -24,30 +39,77 @@ if (!mongoUri) {
   throw new Error('MONGODB_URI environment variable is not set');
 }
 
-// Define Event schema
-const eventSchema = new mongoose.Schema({
-  event_type: String,
-  name: String,
-  organization_name: String,
-  description: String,
-  city: String,
-  state: String,
-  created_at: Date,
-  updated_at: Date,
-  is_virtual: Boolean,
-  visibility: String,
-  tags: String,
-  organization_id: Number,
-  organization_slug: String,
-}, { strict: false });
-
-const Event = mongoose.model('Event', eventSchema, 'full_funnel');
-
-// Connect to MongoDB
-mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
+// MongoDB client setup
+let cachedClient = null;
+let cachedDb = null;
 
 async function connectToDatabase() {
-  if (cachedDb) return cachedDb;
+  if (cachedClient && cachedDb) {
+    return { client: cachedClient, db: cachedDb };
+  }
+
+  try {
+    const client = await MongoClient.connect(mongoUri, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+    });
+
+    const db = client.db();
+    
+    cachedClient = client;
+    cachedDb = db;
+    
+    return { client, db };
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
+  }
+}
+
+exports.handler = async function(event, context) {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: 'Method Not Allowed' };
+  }
+
+  try {
+    const { message } = JSON.parse(event.body);
+    
+    if (!message?.trim()) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: 'Message is required' })
+      };
+    }
+
+    // Connect to MongoDB
+    const { db } = await connectToDatabase();
+    const collection = db.collection('full_funnel');
+
+    // Simple test query
+    const result = await collection.aggregate([
+      {
+        $group: {
+          _id: '$organization_name',
+          count: { $sum: 1 }
+        }
+      }
+    ]).toArray();
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify({
+        data: result,
+        message: 'Query executed successfully'
+      })
+    };
+
+  } catch (error) {
+    console.error('Error:', error);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: 'Internal Server Error', details: error.message })
+    };
+  }
   
   await mongoClient.connect();
   const db = mongoClient.db('full_funnel');
