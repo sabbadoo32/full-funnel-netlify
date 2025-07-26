@@ -1,4 +1,4 @@
-const { MongoClient } = require('mongodb');
+const { MongoClient, ConnectionString } = require('mongodb');
 const OpenAI = require('openai');
 
 // Initialize OpenAI and MongoDB with environment variables
@@ -21,7 +21,13 @@ async function connectToDatabase() {
     
     const mongoUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPass)}@${dbHost}/${dbName}?retryWrites=true&w=majority&appName=Cluster0`;
     
-    client = new MongoClient(mongoUrl);
+    // Validate connection string format
+    console.log('Validating MongoDB URL format...');
+    const parsedUrl = new ConnectionString(mongoUrl);
+    console.log('MongoDB URL format is valid:', parsedUrl.toString());
+    
+    // Initialize client with validated URL
+    client = new MongoClient(parsedUrl.toString());
     await client.connect();
     db = client.db(dbName);
     
