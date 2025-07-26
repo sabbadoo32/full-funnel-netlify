@@ -5,6 +5,11 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
+// Debug log MongoDB URI format (without credentials)
+const uri = process.env.MONGODB_URI || '';
+const redactedUri = uri.replace(/\/\/[^@]*@/, '//****:****@');
+console.log('MongoDB URI format:', redactedUri);
+
 const mongoClient = new MongoClient(process.env.MONGODB_URI);
 
 // Reuse connection
