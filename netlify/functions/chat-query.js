@@ -7,14 +7,12 @@ const openai = new OpenAI({
 });
 
 // Initialize MongoDB connection
-const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
-console.log('MongoDB URI:', mongoUri ? 'URI exists' : 'URI is undefined');
-
+const mongoUri = process.env.MONGODB_URI;
 if (!mongoUri) {
-  throw new Error('MongoDB URI is not set in environment variables');
+  throw new Error('MONGODB_URI environment variable is not set');
 }
 
-const mongoClient = new MongoClient(mongoUri);
+const mongoClient = new MongoClient(mongoUri, { serverApi: { version: '1' } });
 let cachedDb = null;
 
 async function connectToDatabase() {
