@@ -5,12 +5,15 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Debug log MongoDB URI format (without credentials)
+// Validate and normalize MongoDB URI
 const uri = process.env.MONGODB_URI || '';
-const redactedUri = uri.replace(/\/\/[^@]*@/, '//****:****@');
-console.log('MongoDB URI format:', redactedUri);
+if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
+  console.error('Invalid MongoDB URI format. URI must start with mongodb:// or mongodb+srv://');
+  console.log('Current URI format (redacted):', uri.replace(/\/\/[^@]*@/, '//****:****@'));
+  throw new Error('Invalid MongoDB URI format');
+}
 
-const mongoClient = new MongoClient(process.env.MONGODB_URI);
+const mongoClient = new MongoClient(uri);
 
 // Reuse connection
 let cachedDb = null;
