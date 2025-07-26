@@ -1,26 +1,15 @@
-const mongoose = require('mongoose');
+const { MongoClient } = require('mongodb');
 const OpenAI = require('openai');
 
 // Initialize OpenAI and MongoDB with environment variables
 let openai;
-let uri;
-
-// Define schema
-const eventSchema = new mongoose.Schema({
-  organization_name: String,
-  event_type: String,
-  timestamp: Date
-});
-
-// Create model
-const Event = mongoose.model('Event', eventSchema);
+let client;
+let db;
 
 // Reuse connection
-let isConnected = false;
-
 async function connectToDatabase() {
-  if (isConnected) {
-    return;
+  if (client && db) {
+    return db;
   }
 
   try {
@@ -32,18 +21,12 @@ async function connectToDatabase() {
     
     const mongoUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPass)}@${dbHost}/${dbName}?retryWrites=true&w=majority&appName=Cluster0`;
     
-    await mongoose.connect(mongoUrl, {
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      serverApi: {
-        version: '1',
-        strict: true,
-        deprecationErrors: true
-      }
-    });
+    client = new MongoClient(mongoUrl);
+    await client.connect();
+    db = client.db(dbName);
     
-    isConnected = true;
     console.log('MongoDB connected successfully');
+    return db;
   } catch (error) {
     console.error('MongoDB connection error:', error);
     throw error;
@@ -51,7 +34,7 @@ async function connectToDatabase() {
 }
 
 exports.handler = async (event, context) => {
-  // Initialize OpenAI and MongoDB with environment variables
+  // Initialize OpenAI with environment variables
   if (!openai) {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -154,8 +137,9 @@ exports.handler = async (event, context) => {
 
     const analysis = JSON.parse(analysisCompletion.choices[0].message.content);
     
-    // Execute query using Mongoose
-    const data = await Event.find(analysis.query).lean();
+    // Execute query using native MongoDB
+    const collection = db.collection('events');
+    const data = await collection.find(analysis.query).toArray();
 
     // Generate insights
     const insightsCompletion = await openai.chat.completions.create({
