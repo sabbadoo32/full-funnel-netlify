@@ -13,14 +13,11 @@ async function connectToDatabase() {
   }
 
   try {
-    // Use explicit MongoDB URL format
-    const dbUser = process.env.MONGODB_USER || 'sebastianjames';
-    const dbPass = process.env.MONGODB_PASS || 'd@2119ChartwellDrive';
-    const dbHost = process.env.MONGODB_HOST || 'cluster0.gh4va.mongodb.net';
-    const dbName = process.env.MONGODB_NAME || 'full_funnel';
-    
-    const mongoUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPass)}@${dbHost}/${dbName}?retryWrites=true&w=majority&appName=Cluster0`;
-    
+    const mongoUrl = process.env.MONGODB_URI;
+    if (!mongoUrl) {
+      throw new Error('MONGODB_URI environment variable is not set');
+    }
+
     // Validate connection string format
     console.log('Validating MongoDB URL format...');
     const parsedUrl = new ConnectionString(mongoUrl);
