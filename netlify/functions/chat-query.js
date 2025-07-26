@@ -10,10 +10,10 @@ const eventSchema = new mongoose.Schema({
   organization_name: String,
   event_type: String,
   timestamp: Date
-});
+}, { collection: 'events' }); // Explicitly specify collection name
 
-// Create model
-const Event = mongoose.model('Event', eventSchema);
+// Create model only if it hasn't been created
+const Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
 
 // Reuse connection
 async function connectToDatabase() {
