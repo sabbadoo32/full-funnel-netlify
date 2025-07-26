@@ -50,7 +50,11 @@ async function connectToDatabase() {
 
   try {
     console.log('Attempting MongoDB connection...');
-    const client = await MongoClient.connect(mongoUri, {
+    // Extract host from URI for simplified connection
+    const uri = mongoUri.split('@')[1].split('/')[0];
+    const simplifiedUri = `mongodb+srv://sebastianjames:d%402119ChartwellDrive@${uri}?retryWrites=true&w=majority`;
+    
+    const client = await MongoClient.connect(simplifiedUri, {
       serverSelectionTimeoutMS: 5000, // Fail fast if connection can't be established
       useNewUrlParser: true,
       useUnifiedTopology: true,
@@ -61,7 +65,7 @@ async function connectToDatabase() {
     });
 
     // Test the connection
-    const db = client.db();
+    const db = client.db('full_funnel'); // Explicitly select database
     await db.command({ ping: 1 });
     console.log('MongoDB connection successful');
     
