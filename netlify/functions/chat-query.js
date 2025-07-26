@@ -1,17 +1,9 @@
 const mongoose = require('mongoose');
 const OpenAI = require('openai');
-const { env } = require('@netlify/functions');
 
-const openai = new OpenAI({
-  apiKey: env.get('OPENAI_API_KEY')
-});
-
-// Initialize Mongoose connection
-const uri = env.get('MONGODB_URI');
-
-if (!uri) {
-  throw new Error('MONGODB_URI environment variable is not set');
-}
+// Initialize OpenAI and MongoDB with environment variables from context
+let openai;
+let uri;
 
 // Define schema
 const eventSchema = new mongoose.Schema({
@@ -42,6 +34,22 @@ async function connectToDatabase() {
 }
 
 exports.handler = async (event, context) => {
+  // Initialize OpenAI and MongoDB with environment variables from context
+  if (!openai) {
+    openai = new OpenAI({
+      apiKey: context.OPENAI_API_KEY
+    });
+  }
+
+  if (!uri) {
+    uri = context.MONGODB_URI;
+    if (!uri) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'MONGODB_URI environment variable is not set' })
+      };
+    }
+  }
   // Important: Reuse the MongoDB connection
   context.callbackWaitsForEmptyEventLoop = false;
 
