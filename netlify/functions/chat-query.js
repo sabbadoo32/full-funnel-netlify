@@ -19,7 +19,13 @@ async function connectToDatabase() {
     }
 
     console.log('Connecting to MongoDB...');
-    client = new MongoClient(mongoUrl);
+    client = new MongoClient(mongoUrl, {
+      serverApi: {
+        version: '1',
+        strict: true,
+        deprecationErrors: true
+      }
+    });
     await client.connect();
     
     // Get database name from connection string
