@@ -3,7 +3,7 @@ const OpenAI = require('openai');
 
 // Initialize OpenAI and MongoDB with environment variables
 let openai;
-let isConnected = false;
+let cachedConnection = null;
 
 // Define schema
 const eventSchema = new mongoose.Schema({
@@ -17,7 +17,8 @@ const Event = mongoose.models.Event || mongoose.model('Event', eventSchema);
 
 // Reuse connection
 async function connectToDatabase() {
-  if (isConnected) {
+  if (cachedConnection && mongoose.connection.readyState === 1) {
+    console.log('Using cached database connection');
     return Event;
   }
 
@@ -27,13 +28,25 @@ async function connectToDatabase() {
       throw new Error('MONGODB_URI environment variable is not set');
     }
 
-    console.log('Connecting to MongoDB...');
-    await mongoose.connect(mongoUrl, {
+    console.log('Creating new MongoDB connection...');
+    cachedConnection = await mongoose.connect(mongoUrl, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
+      bufferCommands: false,
+      serverSelectionTimeoutMS: 5000
     });
     
-    isConnected = true;
+    // Handle connection errors
+    mongoose.connection.on('error', (err) => {
+      console.error('MongoDB connection error:', err);
+      cachedConnection = null;
+    });
+
+    mongoose.connection.on('disconnected', () => {
+      console.log('MongoDB disconnected');
+      cachedConnection = null;
+    });
+
     console.log('MongoDB connected successfully');
     return Event;
   } catch (error) {
