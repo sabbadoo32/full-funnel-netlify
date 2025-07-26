@@ -1,15 +1,24 @@
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
 const OpenAI = require('openai');
 
 // Initialize OpenAI and MongoDB with environment variables
 let openai;
-let client;
-let db;
+let isConnected = false;
+
+// Define schema
+const eventSchema = new mongoose.Schema({
+  organization_name: String,
+  event_type: String,
+  timestamp: Date
+});
+
+// Create model
+const Event = mongoose.model('Event', eventSchema);
 
 // Reuse connection
 async function connectToDatabase() {
-  if (client && db) {
-    return db;
+  if (isConnected) {
+    return;
   }
 
   try {
@@ -19,21 +28,13 @@ async function connectToDatabase() {
     }
 
     console.log('Connecting to MongoDB...');
-    client = new MongoClient(mongoUrl, {
-      serverApi: {
-        version: '1',
-        strict: true,
-        deprecationErrors: true
-      }
+    await mongoose.connect(mongoUrl, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true
     });
-    await client.connect();
     
-    // Get database name from connection string
-    const dbName = mongoUrl.split('/').pop().split('?')[0];
-    db = client.db(dbName);
-    
+    isConnected = true;
     console.log('MongoDB connected successfully');
-    return db;
   } catch (error) {
     console.error('MongoDB connection error:', error);
     throw error;
