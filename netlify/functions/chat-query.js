@@ -5,20 +5,10 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Try both environment variable names and validate URI
-const uri = process.env.MONGODB_URI || process.env.MONGO_URI || '';
-console.log('Environment variables available:', Object.keys(process.env));
-console.log('MONGODB_URI present:', !!process.env.MONGODB_URI);
-console.log('MONGO_URI present:', !!process.env.MONGO_URI);
-
-if (!uri) {
-  throw new Error('No MongoDB URI found in environment variables');
-}
+// Test with hardcoded URI
+const uri = 'mongodb+srv://sebastianjames:d%402119ChartwellDrive@cluster0.gh4va.mongodb.net/full_funnel?retryWrites=true&w=majority&appName=Cluster0';
 
 if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
-  console.error('Invalid MongoDB URI format');
-  console.log('URI length:', uri.length);
-  console.log('URI first 10 chars:', uri.substring(0, 10));
   throw new Error('Invalid MongoDB URI format - must start with mongodb:// or mongodb+srv://');
 }
 
