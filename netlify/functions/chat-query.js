@@ -5,10 +5,20 @@ const OpenAI = require('openai');
 let openai;
 let isConnected = false;
 
+// Define schema
+const eventSchema = new mongoose.Schema({
+  organization_name: String,
+  event_type: String,
+  timestamp: Date
+});
+
+// Create model
+const Event = mongoose.model('Event', eventSchema);
+
 // Reuse connection
 async function connectToDatabase() {
   if (isConnected) {
-    return;
+    return Event;
   }
 
   try {
@@ -25,6 +35,7 @@ async function connectToDatabase() {
     
     isConnected = true;
     console.log('MongoDB connected successfully');
+    return Event;
   } catch (error) {
     console.error('MongoDB connection error:', error);
     throw error;
@@ -141,9 +152,9 @@ exports.handler = async (event, context) => {
 
       const analysis = JSON.parse(analysisCompletion.choices[0].message.content);
       
-      // Execute query using native MongoDB
-      const collection = db.collection('events');
-      const data = await collection.find(analysis.query).toArray();
+      // Execute query using Mongoose
+      const Event = await connectToDatabase();
+      const data = await Event.find(analysis.query).lean();
 
       // Generate insights
       const insightsCompletion = await openai.chat.completions.create({
