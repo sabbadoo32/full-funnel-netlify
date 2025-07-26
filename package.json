@@ -1,0 +1,10 @@
+{
+  "name": "full-funnel-netlify",
+  "version": "1.0.0",
+  "description": "Full Funnel Analytics with ChatGPT Interface",
+  "main": "netlify/functions/chat-query.js",
+  "dependencies": {
+    "mongodb": "^6.17.0",
+    "openai": "^5.10.2"
+  }
+}
