@@ -1,4 +1,4 @@
-const { MongoClient, ConnectionString } = require('mongodb');
+const { MongoClient } = require('mongodb');
 const OpenAI = require('openai');
 
 // Initialize OpenAI and MongoDB with environment variables
@@ -18,14 +18,12 @@ async function connectToDatabase() {
       throw new Error('MONGODB_URI environment variable is not set');
     }
 
-    // Validate connection string format
-    console.log('Validating MongoDB URL format...');
-    const parsedUrl = new ConnectionString(mongoUrl);
-    console.log('MongoDB URL format is valid:', parsedUrl.toString());
-    
-    // Initialize client with validated URL
-    client = new MongoClient(parsedUrl.toString());
+    console.log('Connecting to MongoDB...');
+    client = new MongoClient(mongoUrl);
     await client.connect();
+    
+    // Get database name from connection string
+    const dbName = mongoUrl.split('/').pop().split('?')[0];
     db = client.db(dbName);
     
     console.log('MongoDB connected successfully');
