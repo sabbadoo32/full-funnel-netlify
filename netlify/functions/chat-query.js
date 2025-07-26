@@ -5,14 +5,18 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-// Test with hardcoded URI
+// Initialize MongoDB with older connection format
 const uri = 'mongodb+srv://sebastianjames:d%402119ChartwellDrive@cluster0.gh4va.mongodb.net/full_funnel?retryWrites=true&w=majority&appName=Cluster0';
 
-if (!uri.startsWith('mongodb://') && !uri.startsWith('mongodb+srv://')) {
-  throw new Error('Invalid MongoDB URI format - must start with mongodb:// or mongodb+srv://');
-}
-
-const mongoClient = new MongoClient(uri);
+const mongoClient = new MongoClient(uri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverApi: {
+    version: '1',
+    strict: true,
+    deprecationErrors: true
+  }
+});
 
 // Reuse connection
 let cachedDb = null;
