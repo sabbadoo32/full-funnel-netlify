@@ -40,148 +40,142 @@ async function connectToDatabase() {
 }
 
 exports.handler = async (event, context) => {
-  // Initialize OpenAI with environment variables
-  if (!openai) {
-    const apiKey = process.env.OPENAI_API_KEY;
-    if (!apiKey) {
-      console.error('OPENAI_API_KEY not found in process.env:', process.env);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'OPENAI_API_KEY environment variable is not set' })
-      };
-    }
-    openai = new OpenAI({ apiKey });
-  }
-
-  if (!uri) {
-    uri = process.env.MONGODB_URI;
-    if (!uri) {
-      console.error('MONGODB_URI not found in process.env:', process.env);
-      return {
-        statusCode: 500,
-        body: JSON.stringify({ error: 'MONGODB_URI environment variable is not set' })
-      };
-    }
-  }
-  // Important: Reuse the MongoDB connection
-  context.callbackWaitsForEmptyEventLoop = false;
-
-  // Handle CORS preflight
-  if (event.httpMethod === 'OPTIONS') {
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS'
-      }
-    };
-  }
-
   try {
-    if (event.httpMethod !== 'POST') {
-      return { 
-        statusCode: 405, 
-        body: JSON.stringify({ error: 'Method Not Allowed' })
-      };
-    }
-
-    const { message } = JSON.parse(event.body);
-    await connectToDatabase();
-
-    // First, check if clarification is needed
-    const clarificationCompletion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: `You are a friendly, helpful marketing analytics expert. Check if the query needs clarification.`
-        },
-        {
-          role: "user",
-          content: message
-        }
-      ]
-    });
-
-    const clarificationResponse = clarificationCompletion.choices[0].message.content;
-    let clarification;
-    try {
-      clarification = JSON.parse(clarificationResponse);
-      if (clarification.needsClarification) {
+    // Initialize OpenAI with environment variables
+    if (!openai) {
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        console.error('OPENAI_API_KEY not found in process.env:', process.env);
         return {
-          statusCode: 200,
-          headers: {
-            'Access-Control-Allow-Origin': '*',
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            needsClarification: true,
-            questions: clarification.questions,
-            suggestions: clarification.suggestions || []
-          })
+          statusCode: 500,
+          body: JSON.stringify({ error: 'OPENAI_API_KEY environment variable is not set' })
         };
       }
-    } catch (e) {
-      console.error('Failed to parse clarification:', e);
+      openai = new OpenAI({ apiKey });
     }
 
-    // Generate MongoDB query
-    const analysisCompletion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "Convert natural language to MongoDB query and analysis"
-        },
-        {
-          role: "user",
-          content: message
+    // Connect to MongoDB
+    const db = await connectToDatabase();
+    if (!db) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Failed to connect to MongoDB' })
+      };
+    }
+
+    // Important: Reuse the MongoDB connection
+    context.callbackWaitsForEmptyEventLoop = false;
+
+    // Handle CORS preflight
+    if (event.httpMethod === 'OPTIONS') {
+      return {
+        statusCode: 200,
+        headers: {
+          'Access-Control-Allow-Origin': '*',
+          'Access-Control-Allow-Headers': 'Content-Type',
+          'Access-Control-Allow-Methods': 'POST, OPTIONS'
         }
-      ]
-    });
+      };
+    }
 
-    const analysis = JSON.parse(analysisCompletion.choices[0].message.content);
-    
-    // Execute query using native MongoDB
-    const collection = db.collection('events');
-    const data = await collection.find(analysis.query).toArray();
+    try {
+      if (event.httpMethod !== 'POST') {
+        return { 
+          statusCode: 405, 
+          body: JSON.stringify({ error: 'Method Not Allowed' })
+        };
+      }
 
-    // Generate insights
-    const insightsCompletion = await openai.chat.completions.create({
-      model: "gpt-4",
-      messages: [
-        {
-          role: "system",
-          content: "Analyze this data and provide actionable insights"
-        },
-        {
-          role: "user",
-          content: JSON.stringify({ query: message, data })
+      const { message } = JSON.parse(event.body);
+      await connectToDatabase();
+
+      // First, check if clarification is needed
+      const clarificationCompletion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: `You are a friendly, helpful marketing analytics expert. Check if the query needs clarification.`
+          },
+          {
+            role: "user",
+            content: message
+          }
+        ]
+      });
+
+      const clarificationResponse = clarificationCompletion.choices[0].message.content;
+      let clarification;
+      try {
+        clarification = JSON.parse(clarificationResponse);
+        if (clarification.needsClarification) {
+          return {
+            statusCode: 200,
+            headers: {
+              'Access-Control-Allow-Origin': '*',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              needsClarification: true,
+              questions: clarification.questions,
+              suggestions: clarification.suggestions || []
+            })
+          };
         }
-      ]
-    });
+      } catch (e) {
+        console.error('Failed to parse clarification:', e);
+      }
 
-    const insights = JSON.parse(insightsCompletion.choices[0].message.content);
+      // Generate MongoDB query
+      const analysisCompletion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "Convert natural language to MongoDB query and analysis"
+          },
+          {
+            role: "user",
+            content: message
+          }
+        ]
+      });
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        data,
-        explanation: analysis.explanation,
-        insights,
-        managerSummary: {
-          keyMetrics: insights.keyMetrics || [],
-          recommendations: insights.recommendations || [],
-          trends: insights.trends || []
-        }
-      })
-    };
+      const analysis = JSON.parse(analysisCompletion.choices[0].message.content);
+      
+      // Execute query using native MongoDB
+      const collection = db.collection('events');
+      const data = await collection.find(analysis.query).toArray();
 
+      // Generate insights
+      const insightsCompletion = await openai.chat.completions.create({
+        model: "gpt-4",
+        messages: [
+          {
+            role: "system",
+            content: "Analyze this data and provide actionable insights"
+          },
+          {
+            role: "user",
+            content: JSON.stringify({ query: message, data })
+          }
+        ]
+      });
+
+      return {
+        statusCode: 200,
+        body: JSON.stringify({ insights: insightsCompletion.choices[0].message.content })
+      };
+    } catch (error) {
+      console.error('Error:', error);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: 'An error occurred while processing your request',
+          details: error.message || error.toString()
+        })
+      };
+    }
   } catch (error) {
     console.error('Function error:', error);
     return {
