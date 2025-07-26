@@ -5,6 +5,7 @@
   "main": "netlify/functions/chat-query.js",
   "dependencies": {
     "mongodb": "^6.17.0",
+    "mongoose": "^8.16.5",
     "openai": "^5.10.2"
   }
 }
