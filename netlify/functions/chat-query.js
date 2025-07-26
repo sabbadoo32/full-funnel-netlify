@@ -61,12 +61,8 @@ exports.handler = async (event, context) => {
     }
 
     // Connect to MongoDB
-    let db;
     try {
-      db = await connectToDatabase();
-      if (!db) {
-        throw new Error('Database connection returned null');
-      }
+      await connectToDatabase();
     } catch (dbError) {
       console.error('MongoDB connection error:', dbError);
       return {
