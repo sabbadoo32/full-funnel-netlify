@@ -1,6 +1,11 @@
 const mongoose = require('mongoose');
 const OpenAI = require('openai');
 
+// Debug Mongoose build type
+console.log('Mongoose type:', typeof mongoose);
+console.log('Mongoose keys:', Object.keys(mongoose));
+console.log('Is browser build?', mongoose.browser);
+
 // Initialize OpenAI and MongoDB with environment variables
 let openai;
 let cachedDb = null;
