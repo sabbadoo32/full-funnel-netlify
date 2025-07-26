@@ -24,7 +24,24 @@ async function connectToDatabase() {
   }
 
   try {
-    await mongoose.connect(uri);
+    // Use explicit MongoDB URL format
+    const dbUser = process.env.MONGODB_USER || 'sebastianjames';
+    const dbPass = process.env.MONGODB_PASS || 'd@2119ChartwellDrive';
+    const dbHost = process.env.MONGODB_HOST || 'cluster0.gh4va.mongodb.net';
+    const dbName = process.env.MONGODB_NAME || 'full_funnel';
+    
+    const mongoUrl = `mongodb+srv://${dbUser}:${encodeURIComponent(dbPass)}@${dbHost}/${dbName}?retryWrites=true&w=majority&appName=Cluster0`;
+    
+    await mongoose.connect(mongoUrl, {
+      useNewUrlParser: true,
+      useUnifiedTopology: true,
+      serverApi: {
+        version: '1',
+        strict: true,
+        deprecationErrors: true
+      }
+    });
+    
     isConnected = true;
     console.log('MongoDB connected successfully');
   } catch (error) {
