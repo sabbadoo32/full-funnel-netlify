@@ -33,54 +33,20 @@ async function callOpenAI(messages) {
   return completion;
 }
 
-// Initialize MongoDB connection with validation
-const mongoUri = process.env.MONGODB_URI;
-if (!mongoUri?.trim()) {
-  throw new Error('MONGODB_URI is not defined or empty');
-}
+const mongoClient = new MongoClient(process.env.MONGODB_URI);
 
-// MongoDB client setup with serverless-friendly settings
-let cachedClient = null;
+// Reuse connection
 let cachedDb = null;
 
 async function connectToDatabase() {
-  if (cachedClient && cachedDb) {
-    return { client: cachedClient, db: cachedDb };
+  if (cachedDb) {
+    return cachedDb;
   }
 
-  try {
-    console.log('Attempting MongoDB connection...');
-    // Extract host from URI for simplified connection
-    const uri = mongoUri.split('@')[1].split('/')[0];
-    const simplifiedUri = `mongodb+srv://sebastianjames:d%402119ChartwellDrive@${uri}?retryWrites=true&w=majority`;
-    
-    const client = await MongoClient.connect(simplifiedUri, {
-      serverSelectionTimeoutMS: 5000, // Fail fast if connection can't be established
-      useNewUrlParser: true,
-      useUnifiedTopology: true,
-      // Add serverless-friendly settings
-      maxPoolSize: 1, // Limit pool size for serverless
-      minPoolSize: 0, // Allow pool to shrink to 0
-      maxIdleTimeMS: 5000, // Close idle connections after 5 seconds
-    });
-
-    // Test the connection
-    const db = client.db('full_funnel'); // Explicitly select database
-    await db.command({ ping: 1 });
-    console.log('MongoDB connection successful');
-    
-    cachedClient = client;
-    cachedDb = db;
-    
-    return { client, db };
-  } catch (error) {
-    console.error('MongoDB connection error:', error);
-    // Log more details about the error
-    console.error('Error name:', error.name);
-    console.error('Error code:', error.code);
-    console.error('Error message:', error.message);
-    throw error;
-  }
+  await mongoClient.connect();
+  const db = mongoClient.db('full_funnel');
+  cachedDb = db;
+  return db;
 }
 
 exports.handler = async (event, context) => {
