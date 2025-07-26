@@ -1,4 +1,4 @@
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
 const { OpenAI } = require('openai');
 const fs = require('fs');
 const path = require('path');
@@ -24,8 +24,27 @@ if (!mongoUri) {
   throw new Error('MONGODB_URI environment variable is not set');
 }
 
-const mongoClient = new MongoClient(mongoUri);
-let cachedDb = null;
+// Define Event schema
+const eventSchema = new mongoose.Schema({
+  event_type: String,
+  name: String,
+  organization_name: String,
+  description: String,
+  city: String,
+  state: String,
+  created_at: Date,
+  updated_at: Date,
+  is_virtual: Boolean,
+  visibility: String,
+  tags: String,
+  organization_id: Number,
+  organization_slug: String,
+}, { strict: false });
+
+const Event = mongoose.model('Event', eventSchema, 'full_funnel');
+
+// Connect to MongoDB
+mongoose.connect(mongoUri, { useNewUrlParser: true, useUnifiedTopology: true });
 
 async function connectToDatabase() {
   if (cachedDb) return cachedDb;
