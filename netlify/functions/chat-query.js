@@ -1,37 +1,9 @@
 const { MongoClient } = require('mongodb');
-const { OpenAI } = require('openai');
+const OpenAI = require('openai');
 
-// Initialize OpenAI with rate limiting
-if (!process.env.OPENAI_API_KEY) {
-  console.error('OPENAI_API_KEY is not set in environment variables');
-  process.exit(1);
-}
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-// Rate limiting setup
-let lastRequestTime = 0;
-const MIN_REQUEST_GAP = 1000; // Minimum 1 second between requests
-
-// Model configuration - matching test script that worked 36 hours ago
-const MODEL = 'gpt-4';
-
-// Helper for rate-limited OpenAI calls
-async function callOpenAI(messages) {
-  // Rate limiting
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
-  if (timeSinceLastRequest < MIN_REQUEST_GAP) {
-    await new Promise(resolve => setTimeout(resolve, MIN_REQUEST_GAP - timeSinceLastRequest));
-  }
-  
-  const completion = await openai.chat.completions.create({
-    model: MODEL,
-    messages: messages
-  });
-  lastRequestTime = Date.now();
-  return completion;
-}
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
+});
 
 const mongoClient = new MongoClient(process.env.MONGODB_URI);
 
