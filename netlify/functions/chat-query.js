@@ -7,7 +7,11 @@ const openai = new OpenAI({
 });
 
 // Initialize MongoDB connection
-const mongoClient = new MongoClient(process.env.MONGODB_URI);
+const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI;
+const mongoClient = new MongoClient(mongoUri, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true
+});
 let cachedDb = null;
 
 async function connectToDatabase() {
