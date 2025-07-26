@@ -5,12 +5,15 @@ const OpenAI = require('openai');
 let openai;
 let isConnected = false;
 
+// Set Mongoose options
+mongoose.set('strictQuery', true);
+
 // Define schema
 const eventSchema = new mongoose.Schema({
   organization_name: String,
   event_type: String,
   timestamp: Date
-});
+}, { strict: true });
 
 // Create model
 const Event = mongoose.model('Event', eventSchema);
@@ -30,7 +33,12 @@ async function connectToDatabase() {
     console.log('Connecting to MongoDB...');
     await mongoose.connect(mongoUrl, {
       useNewUrlParser: true,
-      useUnifiedTopology: true
+      useUnifiedTopology: true,
+      serverApi: {
+        version: '1',
+        strict: true,
+        deprecationErrors: true
+      }
     });
     
     isConnected = true;
