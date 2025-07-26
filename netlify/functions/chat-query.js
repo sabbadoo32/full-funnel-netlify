@@ -1,35 +1,44 @@
-const { MongoClient } = require('mongodb');
+const mongoose = require('mongoose');
 const OpenAI = require('openai');
+const { env } = require('@netlify/functions');
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
+  apiKey: env.get('OPENAI_API_KEY')
 });
 
-// Initialize MongoDB with older connection format
-const uri = 'mongodb+srv://sebastianjames:d%402119ChartwellDrive@cluster0.gh4va.mongodb.net/full_funnel?retryWrites=true&w=majority&appName=Cluster0';
+// Initialize Mongoose connection
+const uri = env.get('MONGODB_URI');
 
-const mongoClient = new MongoClient(uri, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-  serverApi: {
-    version: '1',
-    strict: true,
-    deprecationErrors: true
-  }
+if (!uri) {
+  throw new Error('MONGODB_URI environment variable is not set');
+}
+
+// Define schema
+const eventSchema = new mongoose.Schema({
+  organization_name: String,
+  event_type: String,
+  timestamp: Date
 });
+
+// Create model
+const Event = mongoose.model('Event', eventSchema);
 
 // Reuse connection
-let cachedDb = null;
+let isConnected = false;
 
 async function connectToDatabase() {
-  if (cachedDb) {
-    return cachedDb;
+  if (isConnected) {
+    return;
   }
 
-  await mongoClient.connect();
-  const db = mongoClient.db('full_funnel');
-  cachedDb = db;
-  return db;
+  try {
+    await mongoose.connect(uri);
+    isConnected = true;
+    console.log('MongoDB connected successfully');
+  } catch (error) {
+    console.error('MongoDB connection error:', error);
+    throw error;
+  }
 }
 
 exports.handler = async (event, context) => {
@@ -57,16 +66,15 @@ exports.handler = async (event, context) => {
     }
 
     const { message } = JSON.parse(event.body);
-    const db = await connectToDatabase();
-    const collection = db.collection('full_funnel');
+    await connectToDatabase();
 
-    // Process query with GPT-4
-    const completion = await openai.chat.completions.create({
+    // First, check if clarification is needed
+    const clarificationCompletion = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
         {
           role: "system",
-          content: "You are a marketing analytics expert. Convert this query into a MongoDB query and analysis plan."
+          content: `You are a friendly, helpful marketing analytics expert. Check if the query needs clarification.`
         },
         {
           role: "user",
@@ -75,10 +83,47 @@ exports.handler = async (event, context) => {
       ]
     });
 
-    const analysis = JSON.parse(completion.choices[0].message.content);
+    const clarificationResponse = clarificationCompletion.choices[0].message.content;
+    let clarification;
+    try {
+      clarification = JSON.parse(clarificationResponse);
+      if (clarification.needsClarification) {
+        return {
+          statusCode: 200,
+          headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            needsClarification: true,
+            questions: clarification.questions,
+            suggestions: clarification.suggestions || []
+          })
+        };
+      }
+    } catch (e) {
+      console.error('Failed to parse clarification:', e);
+    }
+
+    // Generate MongoDB query
+    const analysisCompletion = await openai.chat.completions.create({
+      model: "gpt-4",
+      messages: [
+        {
+          role: "system",
+          content: "Convert natural language to MongoDB query and analysis"
+        },
+        {
+          role: "user",
+          content: message
+        }
+      ]
+    });
+
+    const analysis = JSON.parse(analysisCompletion.choices[0].message.content);
     
-    // Execute MongoDB query
-    const data = await collection.find(analysis.query).toArray();
+    // Execute query using Mongoose
+    const data = await Event.find(analysis.query).lean();
 
     // Generate insights
     const insightsCompletion = await openai.chat.completions.create({
@@ -86,14 +131,11 @@ exports.handler = async (event, context) => {
       messages: [
         {
           role: "system",
-          content: "Analyze this marketing data and provide actionable insights for managers."
+          content: "Analyze this data and provide actionable insights"
         },
         {
           role: "user",
-          content: JSON.stringify({
-            query: message,
-            data: data
-          })
+          content: JSON.stringify({ query: message, data })
         }
       ]
     });
